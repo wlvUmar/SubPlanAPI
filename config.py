@@ -1,0 +1,15 @@
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    app_name : str = "Subscription microservice"
+    app_description : str = ""
+    database_url:str = "postgresql+asyncpg://postgres:getout04@localhost:5433/subscription"
+    SECRET:str = "a5326fad5f789679031ba491c5bc5264edad3db915e95de65f558ef6bdbd371f"
+    email_password:str = "dpiq fbrn emnv bvvq"
+    ALGORITHM:str = "HS256"
+    echo_sql:bool =False
+    html_template : str= """<table width="100%" cellpadding="0" cellspacing="0" style="font-family:Arial,sans-serif; color:#333;">  <tr>    <td align="center" style="padding:20px; background:#f5f5f5;">      <h2 style="color:#2a9d8f;">{header}</h2>    </td>  </tr>  <tr>    <td style="padding:20px; background:#ffffff;">      <p>{body}</p>      <a href="{button_url}" style="display:inline-block; padding:10px 20px; background:#2a9d8f; color:#fff; text-decoration:none; border-radius:5px;">{button_text}</a>    </td>  </tr>  <tr>    <td style="padding:20px; background:#f5f5f5; font-size:12px; color:#777;">      {footer}    </td>  </tr></table>"""
+    reset_password_html:str = """<!doctype html><html><head>  <meta charset="utf-8">  <title>Reset Password</title>  <style>    body {{ font-family: system-ui; max-width: 420px; margin: 40px auto; }}    input {{ width: 100%; padding: 8px; margin: 6px 0; }}    .valid {{ color: green; }}    .invalid {{ color: red; }}  </style></head><body>  <h3>Set a new password</h3>  <form id="resetForm">    <input type="hidden" name="token" value="{token}">    <label>New password</label><br>    <input id="password" name="password" type="password" required><br>    <ul>      <li id="len" class="invalid">At least 8 characters</li>      <li id="low" class="invalid">Lowercase letter</li>      <li id="up" class="invalid">Uppercase letter</li>      <li id="num" class="invalid">Digit</li>      <li id="spec" class="invalid">Special char (#@$!%*?&)</li>    </ul>    <label>Confirm password</label><br>    <input id="confirm" name="confirm" type="password" required><br>    <p id="match" class="invalid">Passwords must match</p>    <button type="submit">Reset</button>  </form>  <p id="result"></p><script>const password = document.getElementById("password");const confirmPwd = document.getElementById("confirm");const checks = {{  len: /.{{8,}}/,  low: /[a-z]/,  up: /[A-Z]/,  num: /[0-9]/,  spec: /[#@$!%*?&]/}};password.addEventListener("input", () => {{  for (let key in checks) {{    document.getElementById(key).className = checks[key].test(password.value) ? "valid" : "invalid";  }}}});confirmPwd.addEventListener("input", () => {{  document.getElementById("match").className = confirmPwd.value === password.value ? "valid" : "invalid";}});document.getElementById("resetForm").addEventListener("submit", async (e) => {{  e.preventDefault();  const data = new FormData(e.target);  const res = await fetch("/reset-password", {{    method: "POST",    body: data  }});  const msg = await res.json();  document.getElementById("result").textContent = msg.message || msg.detail || "Error";}});</script></body></html>"""
+    
+
+settings = Settings()
