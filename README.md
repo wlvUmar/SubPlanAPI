@@ -26,13 +26,13 @@ A FastAPI-based subscription management system with JWT authentication, email ve
 
 
 ## 📘 API Docs (Swagger UI)
-![Swagger UI](./images/docs.png)
+![Swagger UI](./images/docs.PNG)
 
 ## 🔐 Admin Panel Login
-![Admin Login](./images/adminlogin.png)
+![Admin Login](./images/adminlogin.PNG)
 
 ## 🧭 Admin Panel Dashboard
-![Admin Dashboard](./images/adminka.png)
+![Admin Dashboard](./images/adminka.PNG)
 
 ## API Endpoints
 
