@@ -29,7 +29,7 @@ A FastAPI-based subscription management system with JWT authentication, email ve
 ![Swagger UI](./images/docs.PNG)
 
 ## 🔐 Admin Panel Login
-![Admin Login](./images/adminlogin.PNG)
+![Admin Login](./images/admin_login.PNG)
 
 ## 🧭 Admin Panel Dashboard
 ![Admin Dashboard](./images/adminka.PNG)
