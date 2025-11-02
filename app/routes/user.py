@@ -46,22 +46,30 @@ async def login_user(credentials: UserLogin, db: AsyncSession = Depends(sessionm
 		return tokens
 
 
-@user.get("/refresh", status_code=200)
+@user.post("/refresh", status_code=200)
 @auth_exception_handler
-async def refresh_tokens(user=Depends(auth_manager.decode), 
+async def refresh_tokens(token_data: dict = Depends(auth_manager.decode), 
 	db:AsyncSession = Depends(sessionmanager.get_db)):
 	
-	tokens = await auth_manager.refresh(user.get("jti"), db)
+	tokens = await auth_manager.refresh(token_data.get("jti"), db)
 	return tokens
 
 
 
 @user.post("/logout")
 @auth_exception_handler
-async def logout(user=Depends(auth_manager.decode), 
+async def logout(payload=Depends(auth_manager.decode), 
 	db:AsyncSession = Depends(sessionmanager.get_db)):
 	
-	await auth_manager.logout(user.get("jti"), db)
+	await auth_manager.logout(payload.get("jti"), db)
+	return Response(204)
+
+@user.post("/logout-all")
+@auth_exception_handler
+async def logout_all(payload=Depends(auth_manager.decode), 
+	db:AsyncSession = Depends(sessionmanager.get_db)):
+	
+	await auth_manager.logout_all(payload.get("sub"), db)
 	return Response(204)
 
 @user.get("/me", status_code=200)
@@ -119,4 +127,21 @@ async def reset_password_submit(
 	except ValidationError:
 		raise AuthException("Weak passowrd")
 	return await auth_manager.reset_password(token, db, password)
+
+@user.put("/change-password")
+@auth_exception_handler
+async def change_password(
+	payload=Depends(auth_manager.decode),
+	old_password: str = Form(...),
+	new_password: str = Form(...),
+	confirm: str = Form(...),
+	db: AsyncSession = Depends(sessionmanager.get_db),
+):
+	if new_password != confirm:
+		raise AuthException("Passwords do not match", 400)
+	try:
+		PasswordModel(password=new_password)
+	except ValidationError:
+		raise AuthException("Weak password")
+	return await auth_manager.change_password(payload.get("sub"), db, old_password, new_password)
 

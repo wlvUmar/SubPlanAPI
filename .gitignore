@@ -4,3 +4,5 @@ structure.txt
 scraping.log
 pyrightconfig.json
 app.log
+ADMIN_PANEL_SETUP.md
+/__pycache__

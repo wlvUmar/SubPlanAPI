@@ -1,3 +1,4 @@
+import traceback
 import uuid
 from fastapi import BackgroundTasks, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -30,6 +31,8 @@ class AuthException(Exception):
             "status_code": self.status_code,
             "details": self.details
         }
+    def __str__(self):
+        return f"{self.status_code} {self.message}"
 
 class AuthManager:
 	def __init__(self) -> None:
@@ -43,14 +46,14 @@ class AuthManager:
 			self.logger.debug("Hashing the password")
 			return 	bcrypt.hash(password)
 		except Exception as e:
-			raise AuthException("Internal error hashing password", 500, details={"origin":e})
+			raise AuthException("Internal error hashing password", 500, details={"origin":e, "traceback": traceback.format_exc()})
 
 	def _verify(self, password:str, hash:str)->bool:
 		try:
 			self.logger.debug("verifying the password")
 			return bcrypt.verify(password, hash)
 		except Exception as e:
-			raise AuthException("Internal error verifying password", 500, details={"origin":e})
+			raise AuthException("Internal error verifying password", 500, details={"origin":e,"traceback": traceback.format_exc()})
 
 	def _create_access_token(self, subject, role, exp=None):
 		try:	
@@ -65,7 +68,7 @@ class AuthManager:
 			encoded = jwt.encode(payload, self._secret, self._algorithm)
 			return encoded
 		except jwt.PyJWTError as e:
-			raise AuthException("Failed to create access token", 500, details={"origin":e})
+			raise AuthException("Failed to create access token", 500, details={"origin":e,"traceback": traceback.format_exc()})
 
 	def _create_refresh_token(self, subject):
 		self.logger.debug("_create_refresh_token called")
@@ -81,7 +84,7 @@ class AuthManager:
 			token = jwt.encode(payload, self._secret, self._algorithm)
 			return new_record ,token
 		except jwt.PyJWTError as e:
-			raise AuthException("Failed to create refresh token", 500, details={"origin":e})
+			raise AuthException("Failed to create refresh token", 500, details={"origin":e,"traceback": traceback.format_exc()})
 
 	async def login(self, db: AsyncSession, credentials:UserLogin, exp = None)->dict:
 		self.logger.debug("AuthManager.login called")
@@ -89,7 +92,7 @@ class AuthManager:
 		try:
 			user = (await db.execute(query)).first()
 		except (OperationalError, DataError) as e:
-			raise AuthException("Database query failed", 500, {"db_error": e})
+			raise AuthException("Database query failed", 500, {"db_error": e,"traceback": traceback.format_exc()})
 
 		if not user:
 			raise AuthException("User not found", 400)
@@ -98,16 +101,15 @@ class AuthManager:
 		if not self._verify(credentials.password, user_password):
 			raise AuthException("Invalid password or user_id", 400)
 		
-		access_token = self._create_access_token(user_id, role, exp)
+		access_token = self._create_access_token(user_id, role.value, exp)
 		new_token, refresh_token =  self._create_refresh_token(user_id)
 		
 		try:
-			self.logger.debug("AuthManager.login transaction started")
-			async with db.begin():
-				db.add(new_token)
+			db.add(new_token)
 
-				self.logger.debug("Issuing an INSERT query")
-				await db.flush()
+			self.logger.debug("Issuing an INSERT query")
+			await db.flush()
+			await db.commit()
 
 		except (DataError, OperationalError) as e:
 			raise AuthException("Failed to store refresh_token", 500, {'db_error': str(e)})
@@ -131,7 +133,7 @@ class AuthManager:
 				new_user.verification_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 				background_tasks.add_task(send_email, str(new_user.verification_token), new_user.email)
 
-				token = self._create_access_token(new_user.user_id, new_user.role)
+				token = self._create_access_token(new_user.user_id, new_user.role.value)
 				new_token, refresh_token =  self._create_refresh_token(new_user.user_id)
 				db.add(new_token)
 			return {"access": token, "refresh": refresh_token} 
@@ -154,10 +156,12 @@ class AuthManager:
 
 		try:
 			payload = jwt.decode(token, self._secret, algorithms=[self._algorithm])
+			self.logger.debug(f"159: {payload}")
 			return payload 
 		except jwt.ExpiredSignatureError:
 			raise HTTPException(status_code=401, detail="Token expired")
 		except jwt.InvalidTokenError:
+			self.logger.debug(token)
 			raise HTTPException(status_code=401, detail="Invalid token")
 		except Exception as e:
 			self.logger.error("Unexpected error decoding token", exc_info=True)
@@ -181,7 +185,7 @@ class AuthManager:
 				new_token, refresh_token = self._create_refresh_token(result.user.user_id)
 				db.add(new_token)
 		
-			access_token = self._create_access_token(result.user.user_id, result.user.role)
+			access_token = self._create_access_token(result.user.user_id, result.user.role.value)
 			return {"access": access_token, "refresh":refresh_token}
 
 		except OperationalError as e:
@@ -205,6 +209,19 @@ class AuthManager:
 		except Exception as e:
 			raise AuthException("Unexpected error during logout", 500)
 
+	async def logout_all(self, user_id:str, db:AsyncSession):
+		try:
+			async with db.begin():
+				query = select(RefreshToken).where(RefreshToken.user_id == user_id)
+				tokens = (await db.execute(query)).scalars().all()
+				for token in tokens:
+					token.revoked = True
+			return True
+		except OperationalError as e:
+			raise AuthException("Database error in AuthManager.logout_all", 500, {"db_error": str(e)})
+		except Exception as e:
+			raise AuthException("Unexpected error during logout_all", 500)
+
 	async def get_user(self, user_id, db:AsyncSession):
 		try:
 			query = select(User).where(User.user_id == user_id)
@@ -219,7 +236,8 @@ class AuthManager:
 
 	def require_role(self, role: str):
 		def wrapper(user=Depends(self.decode)):
-			if user.get("role") != role:
+			if user.get("role") != role :
+				self.logger.debug(f"{user.get("role")}, {role}")
 				raise AuthException(status_code=403, message="Forbidden")
 			return user
 		return wrapper
@@ -242,7 +260,7 @@ class AuthManager:
 				body="Please follow the link to reset your password", 
 				subject="Reset Password Request",
 				button_text="Reset Password",
-				url="http://localhost:8000/reset_password?token=")
+				url="http://localhost:8000/user/reset-password?token=")
 			await db.commit()
 			return {"message": "We've sent you an email with link to reset password"}
 		except UtilException as e:
@@ -274,6 +292,25 @@ class AuthManager:
 			raise AuthException("Database Error in reset_password", 500, details={"origin":e})
 		except Exception as e:
 			raise AuthException("Unexpected Error in reset_password", 500, details={"origin":e})
+
+	async def change_password(self, user_id: str, db:AsyncSession, old_password: str, new_password: str):
+		try:
+			query = select(User).where(User.user_id == user_id)
+			user = (await db.execute(query)).scalars().first()
+			
+			if not user:
+				raise AuthException("User not found", 404)
+			
+			if not self._verify(old_password, user.password):
+				raise AuthException("Invalid old password", 400)
+			
+			user.password = self._hash(new_password)
+			await db.commit()
+			return {"message": "Password changed successfully"}
+		except OperationalError as e:
+			raise AuthException("Database Error in change_password", 500, details={"origin":e})
+		except Exception as e:
+			raise AuthException("Unexpected Error in change_password", 500, details={"origin":e})
 
 
 

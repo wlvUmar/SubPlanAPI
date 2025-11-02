@@ -10,7 +10,7 @@ LOG_FORMAT_COLORED = (
 )
 
 LOG_FORMAT_PLAIN = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 
 def setup_logging(log_file: str = "app.log"):
     color_formatter = ColoredFormatter(
