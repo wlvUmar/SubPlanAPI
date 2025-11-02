@@ -10,6 +10,9 @@ A FastAPI-based subscription management system with JWT authentication, email ve
 - **Session Management**: Logout single device or all devices
 - **Token Refresh**: Secure token rotation system
 - **User Profile**: Get current user information
+- **Admin Panel**: With simple CRUD features
+
+
 
 ## Tech Stack
 
@@ -21,37 +24,15 @@ A FastAPI-based subscription management system with JWT authentication, email ve
 - **email-validator** - Email validation
 - **colorlog** - Colored logging
 
-## Installation
 
-1. Clone the repository
-2. Create a virtual environment:
-```bash
-python -m venv venv
-```
+## 📘 API Docs (Swagger UI)
+![Swagger UI](./images/docs.png)
 
-3. Activate the virtual environment:
-```bash
-# Windows
-venv\Scripts\activate
+## 🔐 Admin Panel Login
+![Admin Login](./images/adminlogin.png)
 
-# Linux/Mac
-source venv/bin/activate
-```
-
-4. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-5. Configure database in `config.py`:
-```python
-database_url = "postgresql+asyncpg://user:password@localhost:5432/database"
-```
-
-6. Run the application:
-```bash
-python main.py
-```
+## 🧭 Admin Panel Dashboard
+![Admin Dashboard](./images/adminka.png)
 
 ## API Endpoints
 
